@@ -1,0 +1,18 @@
+{
+	"name": "rl-socket",
+	"version": "0.0.1",
+	"description": "WebSocket server for Rocket League overlay",
+	"dependencies": {
+		"ws": "^8.13.0"
+	},
+	"scripts": {
+		"build": "webpack --config webpack.config.cjs --mode production"
+	},
+	"devDependencies": {
+		"bufferutil": "^4.0.7",
+		"utf-8-validate": "^6.0.3",
+		"webpack": "^5.88.1",
+		"webpack-cli": "^5.1.4",
+		"webpack-node-externals": "^3.0.0"
+	}
+}
