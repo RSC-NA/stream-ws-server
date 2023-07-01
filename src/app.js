@@ -4,8 +4,8 @@ const wss = new WebSocketServer({ port: 8321 });
 
 let connections = {};
 
-wss.on('connection', function connection(ws) {
-	ws.on('error', console.error);
+wss.on("connection", function connection(ws) {
+	ws.on("error", console.error);
 
 	let connectionId = (+ new Date()).toString();
 	connections[connectionId] = {
@@ -13,7 +13,7 @@ wss.on('connection', function connection(ws) {
 		registeredClients: [],
 	}
 
-	ws.on('message', function message(msg) {
+	ws.on("message", function message(msg) {
 		// console.log('received: %s', msg);
 
 		try {
@@ -33,7 +33,7 @@ wss.on('connection', function connection(ws) {
 						if (!connections.hasOwnProperty(c)) {
 							continue;
 						}
-						if (connections[c].registeredClients.indexOf(dataParse.clientId)) {
+						if (connections[c].registeredClients.indexOf(dataParse.clientId) > -1) {
 							setTimeout(() => {
 								connections[c].connection.send(JSON.stringify(dataParse));
 							}, 0);
