@@ -5,7 +5,7 @@ module.exports = {
 	target: "node",
 	entry: "./src/app.js",
 	output: {
-		filename: "app.js",
+		filename: "ws-server.js",
 		path: path.resolve(__dirname, "dist"),
 	},
 };
