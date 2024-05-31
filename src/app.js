@@ -25,7 +25,7 @@ wss.on("connection", function connection(ws) {
 				if (dataParse.event === "unregister" && connections[connectionId].registeredClients.indexOf(dataParse.clientId) > -1) {
 					connections[connectionId.registeredClients.splice(connections[connectionId].registeredClients.indexOf(dataParse.clientId), 1)];
 				}
-				if (dataParse.event === "update" && dataParse.hasOwnProperty("data") && connections[connectionId].registeredClients.indexOf(dataParse.clientId) > -1) {
+				if (dataParse.event !== "register" && dataParse.event !=="unregister" && dataParse.hasOwnProperty("data") && connections[connectionId].registeredClients.indexOf(dataParse.clientId) > -1) {
 					for (let c in connections) {
 						if (connectionId === c) {
 							continue;
