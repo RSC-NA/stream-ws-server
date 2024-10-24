@@ -18,14 +18,37 @@ wss.on("connection", function connection(ws) {
 
 		try {
 			const dataParse = JSON.parse(msg)
-			if (dataParse.hasOwnProperty("event") && dataParse.hasOwnProperty("clientId")) {
-				if (dataParse.event === "register" && connections[connectionId].registeredClients.indexOf(dataParse.clientId) < 0) {
-					connections[connectionId].registeredClients.push(dataParse.clientId);
+			const clientIndex = connections[connectionId].registeredClients.map((client) => client.clientId).indexOf(dataParse.clientId);
+
+			if (dataParse.hasOwnProperty("event") && dataParse.hasOwnProperty("clientId") && dataParse.hasOwnProperty("data")) {
+
+				// register
+				if (dataParse.event === "register" && typeof(dataParse.data) === "string") {
+					if (clientIndex === -1) {
+						connections[connectionId].registeredClients.push({
+							clientId: dataParse.clientId,
+							subscriptions: [dataParse.data],
+						});
+					} else if (connections[connectionId].registeredClients[clientIndex].subscriptions.indexOf(dataParse.data) === -1) {
+						connections[connectionId].registeredClients[clientIndex].subscriptions.push(dataParse.data);
+					}
 				}
-				if (dataParse.event === "unregister" && connections[connectionId].registeredClients.indexOf(dataParse.clientId) > -1) {
-					connections[connectionId.registeredClients.splice(connections[connectionId].registeredClients.indexOf(dataParse.clientId), 1)];
+
+				// unregister
+				if (dataParse.event === "unregister" && clientIndex > -1  && typeof(dataParse.data) === "string") {
+					const subscriptionIndex = connections[connectionId].registeredClients[clientIndex].subscriptions.indexOf(dataParse.data);
+					if (subscriptionIndex > -1) {
+						if (connections[connectionId].registeredClients[clientIndex].subscriptions.length === 1) {
+							connections[connectionId].registeredClients.splice(clientIndex, 1);
+						} else {
+							connections[connectionId].registeredClients[clientIndex].subscriptions.splice(subscriptionIndex, 1);
+						}
+					}
 				}
-				if (dataParse.event !== "register" && dataParse.event !=="unregister" && dataParse.hasOwnProperty("data") && connections[connectionId].registeredClients.indexOf(dataParse.clientId) > -1) {
+
+
+				// received message, send to subscribers
+				if (dataParse.event !== "register" && dataParse.event !=="unregister" && dataParse.hasOwnProperty("data")) {
 					for (let c in connections) {
 						if (connectionId === c) {
 							continue;
@@ -33,13 +56,24 @@ wss.on("connection", function connection(ws) {
 						if (!connections.hasOwnProperty(c)) {
 							continue;
 						}
-						if (connections[c].registeredClients.indexOf(dataParse.clientId) > -1) {
+
+						const cIndex = connections[c].registeredClients.map((client) => client.clientId).indexOf(dataParse.clientId);
+
+						if (cIndex === -1) {
+							continue;
+						}
+						if (!connections[c].registeredClients[cIndex].hasOwnProperty("subscriptions")) {
+							continue;
+						}
+
+						if (cIndex > -1 && connections[c].registeredClients[cIndex].subscriptions.indexOf(dataParse.event) > -1) {
 							setTimeout(() => {
 								connections[c].connection.send(JSON.stringify(dataParse));
 							}, 0);
 						}
 					}
 				}
+
 			}
 
 		} catch(e) {
