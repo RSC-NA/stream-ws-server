@@ -1,10 +1,27 @@
-import { WebSocketServer } from 'ws';
+import { WebSocket, WebSocketServer } from "ws";
 
-const wss = new WebSocketServer({ port: 8321 });
+const https = require("https");
+const fs = require("fs");
+
+// windows for local testing; go ahead and judge
+const path = process.platform === "win32" ? "C:\\Users\\kj\\Development\\rlcert\\" : "/home/kj767/rlcert/";
+console.log(process.cwd());
+
+try {
+
+const server = https.createServer({
+	cert: fs.readFileSync(path + "certificate.pem"),
+	key: fs.readFileSync(path + "key.pem"),
+});
+
+const wss = new WebSocketServer({
+	server,
+});
 
 let connections = {};
 
 wss.on("connection", function connection(ws) {
+	console.log("connection received");
 	ws.on("error", console.error);
 
 	let connectionId = (+ new Date()).toString();
@@ -14,7 +31,7 @@ wss.on("connection", function connection(ws) {
 	}
 
 	ws.on("message", function message(msg) {
-		// console.log('received: %s', msg);
+		// console.log("received: %s", msg);
 
 		try {
 			const dataParse = JSON.parse(msg)
@@ -84,3 +101,22 @@ wss.on("connection", function connection(ws) {
 	});
 
 });
+
+server.listen(8321, function listening() {
+
+	const ws = new WebSocket(`wss://localhost:${server.address().port}`, {
+	  rejectUnauthorized: false
+	});
+
+	ws.on("error", console.error);
+
+	ws.on("open", function open() {
+		// console.log("cool", server.address().port);
+	});
+
+});
+
+
+} catch (err) {
+	console.log(err);
+}
