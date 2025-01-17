@@ -1,6 +1,6 @@
 import { WebSocket, WebSocketServer } from "ws";
 
-const https = require("https");
+const http = require("http");
 const fs = require("fs");
 
 // windows for local testing; go ahead and judge
@@ -9,10 +9,7 @@ console.log(process.cwd());
 
 try {
 
-const server = https.createServer({
-	cert: fs.readFileSync(path + "certificate.pem"),
-	key: fs.readFileSync(path + "key.pem"),
-});
+const server = http.createServer();
 
 const wss = new WebSocketServer({
 	server,
@@ -104,7 +101,7 @@ wss.on("connection", function connection(ws) {
 
 server.listen(8321, function listening() {
 
-	const ws = new WebSocket(`wss://localhost:${server.address().port}`, {
+	const ws = new WebSocket(`ws://localhost:${server.address().port}`, {
 	  rejectUnauthorized: false
 	});
 
