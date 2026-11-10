@@ -1,87 +1,68 @@
-import { WebSocketServer } from "ws";
+import { WebSocketServer, WebSocket } from "ws";
+
+const HEARTBEAT_MS = 30_000;
 
 const wss = new WebSocketServer({ port: 8321 });
 
-let connections = {};
+// socket -> { alive, subscriptions: clientId -> Set<event name> }
+const sockets = new Map();
 
-wss.on("connection", function connection(ws) {
+wss.on("connection", (ws) => {
 	console.log("connection received");
+	const state = { alive: true, subscriptions: new Map() };
+	sockets.set(ws, state);
+
 	ws.on("error", console.error);
+	ws.on("pong", () => { state.alive = true; });
+	ws.on("close", () => { sockets.delete(ws); });
 
-	let connectionId = (+ new Date()).toString();
-	connections[connectionId] = {
-		connection: ws,
-		registeredClients: [],
-	}
-
-	ws.on("message", function message(msg) {
-		// console.log("received: %s", msg);
-
+	ws.on("message", (raw) => {
+		let message;
 		try {
-			const dataParse = JSON.parse(msg)
-			const clientIndex = connections[connectionId].registeredClients.map((client) => client.clientId).indexOf(dataParse.clientId);
-
-			if (dataParse.hasOwnProperty("event") && dataParse.hasOwnProperty("clientId") && dataParse.hasOwnProperty("data")) {
-
-				// register
-				if (dataParse.event === "register" && typeof(dataParse.data) === "string") {
-					if (clientIndex === -1) {
-						connections[connectionId].registeredClients.push({
-							clientId: dataParse.clientId,
-							subscriptions: [dataParse.data],
-						});
-					} else if (connections[connectionId].registeredClients[clientIndex].subscriptions.indexOf(dataParse.data) === -1) {
-						connections[connectionId].registeredClients[clientIndex].subscriptions.push(dataParse.data);
-					}
-				}
-
-				// unregister
-				if (dataParse.event === "unregister" && clientIndex > -1  && typeof(dataParse.data) === "string") {
-					const subscriptionIndex = connections[connectionId].registeredClients[clientIndex].subscriptions.indexOf(dataParse.data);
-					if (subscriptionIndex > -1) {
-						if (connections[connectionId].registeredClients[clientIndex].subscriptions.length === 1) {
-							connections[connectionId].registeredClients.splice(clientIndex, 1);
-						} else {
-							connections[connectionId].registeredClients[clientIndex].subscriptions.splice(subscriptionIndex, 1);
-						}
-					}
-				}
-
-
-				// received message, send to subscribers
-				if (dataParse.event !== "register" && dataParse.event !=="unregister" && dataParse.hasOwnProperty("data")) {
-					for (let c in connections) {
-						if (connectionId === c) {
-							continue;
-						}
-						if (!connections.hasOwnProperty(c)) {
-							continue;
-						}
-
-						const cIndex = connections[c].registeredClients.map((client) => client.clientId).indexOf(dataParse.clientId);
-
-						if (cIndex === -1) {
-							continue;
-						}
-						if (!connections[c].registeredClients[cIndex].hasOwnProperty("subscriptions")) {
-							continue;
-						}
-
-						if (cIndex > -1 && connections[c].registeredClients[cIndex].subscriptions.indexOf(dataParse.event) > -1) {
-							setTimeout(() => {
-								connections[c].connection.send(JSON.stringify(dataParse));
-							}, 0);
-						}
-					}
-				}
-
-			}
-
-		} catch(e) {
+			message = JSON.parse(raw);
+		} catch (e) {
 			console.error(e);
 			return;
 		}
+		const { clientId, event, data } = message ?? {};
+		if (clientId === undefined || event === undefined || data === undefined) {
+			return;
+		}
 
+		if (event === "register") {
+			if (typeof data === "string") {
+				const events = state.subscriptions.get(clientId) ?? new Set();
+				events.add(data);
+				state.subscriptions.set(clientId, events);
+			}
+			return;
+		}
+
+		if (event === "unregister") {
+			const events = state.subscriptions.get(clientId);
+			events?.delete(data);
+			if (events?.size === 0) {
+				state.subscriptions.delete(clientId);
+			}
+			return;
+		}
+
+		const text = JSON.stringify(message);
+		for (const [other, { subscriptions }] of sockets) {
+			if (other !== ws && other.readyState === WebSocket.OPEN && subscriptions.get(clientId)?.has(event)) {
+				other.send(text);
+			}
+		}
 	});
-
 });
+
+setInterval(() => {
+	for (const [ws, state] of sockets) {
+		if (!state.alive) {
+			ws.terminate();
+			continue;
+		}
+		state.alive = false;
+		ws.ping();
+	}
+}, HEARTBEAT_MS);
